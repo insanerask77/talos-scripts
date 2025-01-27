@@ -1,0 +1,7 @@
+    network:
+        interfaces:
+            - deviceSelector:
+                physical: true
+              dhcp: true
+              vip:
+                ip: placeholder
