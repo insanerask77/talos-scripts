@@ -60,7 +60,6 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Replace machine network config with network-config.yaml contents
         sed -i '/network: {}/r network-config.yaml' controlplane.yaml && sed -i '/network: {}/d' controlplane.yaml
-        sed -i '/network: {}/r network-config.yaml' worker.yaml && sed -i '/network: {}/d' worker.yaml
 
         # Replace endpoint string with VIP in worker.yaml
         sed -i -E "s/(endpoint: https:\/\/)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:6443)/\1$VIP\2/" controlplane.yaml
