@@ -54,14 +54,17 @@ if [[ "$RESPONSE" == "Y" ]];then
         cat controlplane.yaml extension-config.yaml > temp.txt
         mv temp.txt controlplane.yaml -f
 
-        # Append extension-config.yaml (tailscale config) to worker.yaml
+        # Append extension-config.yaml (tailscale config) to controlplane and worker files
         cat worker.yaml extension-config.yaml > temp.txt
         mv temp.txt worker.yaml -f
 
-        # Replace machine network config with network-config.yaml contents
+        # TODO - Add longhorn mounts to configs
+        # sed '0,/kubelet:/r longhorn-mounts.yaml' controlplane.yaml
+
+        # Add VIP config to controlplane.yaml
         sed -i '/network: {}/r network-config.yaml' controlplane.yaml && sed -i '/network: {}/d' controlplane.yaml
 
-        # Replace endpoint string with VIP in worker.yaml
+        # Replace endpoint string with VIP
         sed -i -E "s/(endpoint: https:\/\/)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:6443)/\1$VIP\2/" controlplane.yaml
         sed -i -E "s/(endpoint: https:\/\/)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:6443)/\1$VIP\2/" worker.yaml
 
