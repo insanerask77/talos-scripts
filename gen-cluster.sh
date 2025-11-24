@@ -62,10 +62,8 @@ if [[ "$RESPONSE" == "Y" ]];then
         sed -i '/network: {}/r network-config-temp.yaml' _out/controlplane.yaml && sed -i '/network: {}/d' _out/controlplane.yaml
         rm -f network-config-temp.yaml
 
-        # Add longhorn mounts to both controlplane and worker configs
-        echo "Adding Longhorn mounts to configurations..."
-        sed -i '0,/kubelet:/r longhorn-mounts.yaml' _out/controlplane.yaml
-        sed -i '0,/kubelet:/r longhorn-mounts.yaml' _out/worker.yaml
+        # Note: Longhorn mounts will be applied via talosctl patch after bootstrap
+        # This is the recommended approach to avoid sed complexity with YAML structure
 
         # Apply config to the first node
         echo "Applying configuration to node $NODE_IP..."
@@ -143,6 +141,16 @@ if [[ "$RESPONSE" == "Y" ]];then
         else
             echo "WARNING: Failed to retrieve kubeconfig. You may need to wait and try manually:"
             echo "talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig"
+        fi
+
+        # Apply Longhorn mounts patch
+        echo
+        echo "Applying Longhorn mounts configuration..."
+        if talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP --talosconfig=_out/talosconfig; then
+            echo "✓ Longhorn mounts applied successfully"
+        else
+            echo "WARNING: Failed to apply Longhorn mounts. You can apply manually with:"
+            echo "talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP --talosconfig=_out/talosconfig"
         fi
 
         echo
