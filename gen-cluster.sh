@@ -2,7 +2,7 @@
 
 TALOS_VERSION="v1.9.2"
 
-if [ -f ./controlplane.yaml ] || [ -f ./worker.yaml ] || [ -f ./talosconfig ]; then
+if [ -f _out/controlplane.yaml ] || [ -f _out/worker.yaml ] || [ -f ./talosconfig ]; then
     echo "ERROR: Existing configuration detected. 
           
 Please remove the following files or work out of a different directory:
@@ -52,8 +52,7 @@ if [[ "$RESPONSE" == "Y" ]];then
         echo "Schematic ID: $SCHEMATIC"
         
         echo "Generating Talos configuration..."
-        talosctl gen config $CLUSTER_NAME https://$NODE_IP:6443 --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
-
+        talosctl gen config $CLUSTER_NAME https://$NODE_IP:6443 --output-dir _out --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
         # Replace VIP placeholder in network-config.yaml BEFORE injecting it
         echo "Preparing network configuration with VIP: $VIP"
         sed "s/placeholder/$VIP/" network-config.yaml > network-config-temp.yaml
@@ -75,7 +74,10 @@ if [[ "$RESPONSE" == "Y" ]];then
         #########################
         # BOOTSTRAP THE CLUSTER #
         #########################
-
+        # Wait 1 minute for node to reboot
+        echo "Waiting for node to reboot..."
+        sleep 60
+        
         echo "Waiting for Talos API to become available..."
         TIMEOUT=300 # Set the timeout in seconds (5 minutes)
         INTERVAL=5 # Interval between retries in seconds
@@ -97,7 +99,7 @@ if [[ "$RESPONSE" == "Y" ]];then
             ELAPSED=$((CURRENT_TIME - START_TIME))
             if [ $ELAPSED -ge $TIMEOUT ]; then
                 echo "ERROR: Timeout reached waiting for Talos API. The node may not have applied the configuration correctly."
-                echo "Try manually running: talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig"
+                echo "Try manually running: talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
                 exit 1
             fi
         done
@@ -108,7 +110,7 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Bootstrap the cluster
         echo "Bootstrapping the cluster..."
-        if talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig; then
+        if talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
             echo "Bootstrap successful!"
         else
             echo "WARNING: Bootstrap command failed. This may be normal if the cluster is already bootstrapped."
@@ -118,8 +120,8 @@ if [[ "$RESPONSE" == "Y" ]];then
         echo "Waiting for Kubernetes API to become available..."
         START_TIME=$(date +%s)
         while true; do
-            if nc -z -w5 $VIP 6443; then
-                echo "Kubernetes API is responding on VIP $VIP:6443"
+            if nc -z -w5 $NODE_IP 6443; then
+                echo "Kubernetes API is responding on node $NODE_IP:6443"
                 break
             fi
             
@@ -136,11 +138,11 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Retrieve kubeconfig
         echo "Retrieving kubeconfig..."
-        if talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=./talosconfig; then
+        if talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig; then
             echo "Kubeconfig retrieved successfully!"
         else
             echo "WARNING: Failed to retrieve kubeconfig. You may need to wait and try manually:"
-            echo "talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=./talosconfig"
+            echo "talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig"
         fi
 
         echo
