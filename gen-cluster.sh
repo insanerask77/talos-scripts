@@ -59,17 +59,17 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Add VIP network config to controlplane.yaml
         echo "Injecting network configuration into controlplane.yaml..."
-        sed -i '/network: {}/r network-config-temp.yaml' controlplane.yaml && sed -i '/network: {}/d' controlplane.yaml
+        sed -i '/network: {}/r network-config-temp.yaml' _out/controlplane.yaml && sed -i '/network: {}/d' _out/controlplane.yaml
         rm -f network-config-temp.yaml
 
         # Add longhorn mounts to both controlplane and worker configs
         echo "Adding Longhorn mounts to configurations..."
-        sed -i '0,/kubelet:/r longhorn-mounts.yaml' controlplane.yaml
-        sed -i '0,/kubelet:/r longhorn-mounts.yaml' worker.yaml
+        sed -i '0,/kubelet:/r longhorn-mounts.yaml' _out/controlplane.yaml
+        sed -i '0,/kubelet:/r longhorn-mounts.yaml' _out/worker.yaml
 
         # Apply config to the first node
         echo "Applying configuration to node $NODE_IP..."
-        talosctl apply-config -f controlplane.yaml --insecure -n $NODE_IP -e $NODE_IP 
+        talosctl apply-config -f _out/controlplane.yaml --insecure -n $NODE_IP -e $NODE_IP 
         
         #########################
         # BOOTSTRAP THE CLUSTER #
