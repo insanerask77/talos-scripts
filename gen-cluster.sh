@@ -150,6 +150,29 @@ if [[ "$RESPONSE" == "Y" ]];then
             echo "talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
         fi
 
+        # Apply v2dataEngine patch
+        echo
+        echo "Applying v2dataEngine configuration..."
+        if talosctl patch machineconfig -p @v2dataEngine.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
+            echo "✓ v2dataEngine applied successfully"
+        else
+            echo "WARNING: Failed to apply v2dataEngine. You can apply manually with:"
+            echo "talosctl patch machineconfig -p @v2dataEngine.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
+        fi
+
+        #
+        # Apply admision control patch
+        echo
+        echo "Applying admision control configuration..."
+        if talosctl patch machineconfig -p @admisioncontrol.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
+            echo "✓ admision control applied successfully"
+        else
+            echo "WARNING: Failed to apply admision control. You can apply manually with:"
+            echo "talosctl patch machineconfig -p @admisioncontrol.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
+        fi
+
+
+
         echo
         echo "=========================================="
         echo "Cluster deployment complete!"
