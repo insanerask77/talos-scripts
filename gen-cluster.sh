@@ -67,7 +67,7 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Apply config to the first node
         echo "Applying configuration to node $NODE_IP..."
-        talosctl apply-config -f _out/controlplane.yaml --insecure -n $NODE_IP -e $NODE_IP 
+        talosctl apply-config -f _out/controlplane.yaml --insecure -n $NODE_IP -e $VIP 
         
         #########################
         # BOOTSTRAP THE CLUSTER #
@@ -97,7 +97,7 @@ if [[ "$RESPONSE" == "Y" ]];then
             ELAPSED=$((CURRENT_TIME - START_TIME))
             if [ $ELAPSED -ge $TIMEOUT ]; then
                 echo "ERROR: Timeout reached waiting for Talos API. The node may not have applied the configuration correctly."
-                echo "Try manually running: talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
+                echo "Try manually running: talosctl bootstrap -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig"
                 exit 1
             fi
         done
@@ -108,7 +108,7 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Bootstrap the cluster
         echo "Bootstrapping the cluster..."
-        if talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
+        if talosctl bootstrap -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig; then
             echo "Bootstrap successful!"
         else
             echo "WARNING: Bootstrap command failed. This may be normal if the cluster is already bootstrapped."
