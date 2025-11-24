@@ -133,21 +133,21 @@ if [[ "$RESPONSE" == "Y" ]];then
 
         # Retrieve kubeconfig
         echo "Retrieving kubeconfig..."
-        if talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig; then
+        if talosctl kubeconfig -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
             echo "Kubeconfig retrieved successfully!"
         else
             echo "WARNING: Failed to retrieve kubeconfig. You may need to wait and try manually:"
-            echo "talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=_out/talosconfig"
+            echo "talosctl kubeconfig -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
         fi
 
         # Apply Longhorn mounts patch
         echo
         echo "Applying Longhorn mounts configuration..."
-        if talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP --talosconfig=_out/talosconfig; then
+        if talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig; then
             echo "✓ Longhorn mounts applied successfully"
         else
             echo "WARNING: Failed to apply Longhorn mounts. You can apply manually with:"
-            echo "talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP --talosconfig=_out/talosconfig"
+            echo "talosctl patch machineconfig -p @longhorn-mounts.yaml -n $NODE_IP -e $NODE_IP --talosconfig=_out/talosconfig"
         fi
 
         echo
