@@ -2,4 +2,3 @@ controlplane.yaml
 worker.yaml
 talosconfig
 extension-config.yaml
-network-config.yaml
