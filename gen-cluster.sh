@@ -46,47 +46,48 @@ if [[ "$RESPONSE" == "Y" ]];then
     if ping -c 4 $NODE_IP; then
     
         # Get schematic ID and generate initial config file
+        echo "Fetching schematic ID from factory.talos.dev..."
         SCHEMATIC=$(curl -sX POST --data-binary @schematic.yaml https://factory.talos.dev/schematics)
         SCHEMATIC=$(echo "$SCHEMATIC" | jq '.id' | tr -d '"')
-        talosctl gen config $CLUSTER_NAME https://$NODE_IP:6443 --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
+        echo "Schematic ID: $SCHEMATIC"
+        
+        echo "Generating Talos configuration..."
+        talosctl gen config $CLUSTER_NAME https://$VIP:6443 --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
 
-        # Append extension-config.yaml (tailscale config) to controlplane.yaml
-        cat controlplane.yaml extension-config.yaml > temp.txt
-        mv temp.txt controlplane.yaml -f
+        # Replace VIP placeholder in network-config.yaml BEFORE injecting it
+        echo "Preparing network configuration with VIP: $VIP"
+        sed "s/placeholder/$VIP/" network-config.yaml > network-config-temp.yaml
 
-        # Append extension-config.yaml (tailscale config) to controlplane and worker files
-        cat worker.yaml extension-config.yaml > temp.txt
-        mv temp.txt worker.yaml -f
+        # Add VIP network config to controlplane.yaml
+        echo "Injecting network configuration into controlplane.yaml..."
+        sed -i '/network: {}/r network-config-temp.yaml' controlplane.yaml && sed -i '/network: {}/d' controlplane.yaml
+        rm -f network-config-temp.yaml
 
-        # TODO - Add longhorn mounts to configs
-        # sed '0,/kubelet:/r longhorn-mounts.yaml' controlplane.yaml
+        # Add longhorn mounts to both controlplane and worker configs
+        echo "Adding Longhorn mounts to configurations..."
+        sed -i '0,/kubelet:/r longhorn-mounts.yaml' controlplane.yaml
+        sed -i '0,/kubelet:/r longhorn-mounts.yaml' worker.yaml
 
-        # Add VIP config to controlplane.yaml
-        sed -i '/network: {}/r network-config.yaml' controlplane.yaml && sed -i '/network: {}/d' controlplane.yaml
-
-        # Replace endpoint string with VIP
-        sed -i -E "s/(endpoint: https:\/\/)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:6443)/\1$VIP\2/" controlplane.yaml
-        sed -i -E "s/(endpoint: https:\/\/)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(:6443)/\1$VIP\2/" worker.yaml
-
-        # Apply config, bootstrap the cluster and retrieve kubeconfig
-        talosctl apply-config -f controlplane.yaml --insecure -n $NODE_IP -e $NODE_IP
+        # Apply config to the first node
+        echo "Applying configuration to node $NODE_IP..."
+        talosctl apply-config -f controlplane.yaml --insecure -n $NODE_IP -e $NODE_IP 
         
         #########################
         # BOOTSTRAP THE CLUSTER #
         #########################
 
-        TIMEOUT=180 # Set the timeout in seconds (e.g., 5 minutes)
+        echo "Waiting for Talos API to become available..."
+        TIMEOUT=300 # Set the timeout in seconds (5 minutes)
         INTERVAL=5 # Interval between retries in seconds
         START_TIME=$(date +%s)
+        
+        # Wait for apid to be ready (port 50000)
         while true; do
             if nc -z -w5 $NODE_IP 50000; then
-                echo
-                echo "Cluster ready! Bootstrapping and retrieving kubeconfig..."
-                talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig
-                talosctl kubeconfig -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig
+                echo "Talos API is responding on port 50000"
                 break
             else
-                echo "Cluster not ready for bootstrap. Will continue to retry until timeout..."
+                echo "Waiting for Talos API to become available..."
             fi
             
             sleep $INTERVAL
@@ -95,17 +96,71 @@ if [[ "$RESPONSE" == "Y" ]];then
             CURRENT_TIME=$(date +%s)
             ELAPSED=$((CURRENT_TIME - START_TIME))
             if [ $ELAPSED -ge $TIMEOUT ]; then
-                echo "Timeout reached while checking connection to cluster. Unable to bootstrap. Try running -- talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig"
+                echo "ERROR: Timeout reached waiting for Talos API. The node may not have applied the configuration correctly."
+                echo "Try manually running: talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig"
+                exit 1
+            fi
+        done
+
+        # Additional wait to ensure etcd is ready
+        echo "Waiting additional time for etcd to initialize..."
+        sleep 10
+
+        # Bootstrap the cluster
+        echo "Bootstrapping the cluster..."
+        if talosctl bootstrap -n $NODE_IP -e $NODE_IP --talosconfig=./talosconfig; then
+            echo "Bootstrap successful!"
+        else
+            echo "WARNING: Bootstrap command failed. This may be normal if the cluster is already bootstrapped."
+        fi
+
+        # Wait for Kubernetes API to become available
+        echo "Waiting for Kubernetes API to become available..."
+        START_TIME=$(date +%s)
+        while true; do
+            if nc -z -w5 $VIP 6443; then
+                echo "Kubernetes API is responding on VIP $VIP:6443"
+                break
+            fi
+            
+            sleep $INTERVAL
+
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+                echo "WARNING: Timeout reached waiting for Kubernetes API on VIP."
+                echo "The VIP may take additional time to become active after etcd elections complete."
                 break
             fi
         done
+
+        # Retrieve kubeconfig
+        echo "Retrieving kubeconfig..."
+        if talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=./talosconfig; then
+            echo "Kubeconfig retrieved successfully!"
+        else
+            echo "WARNING: Failed to retrieve kubeconfig. You may need to wait and try manually:"
+            echo "talosctl kubeconfig -n $NODE_IP -e $VIP --talosconfig=./talosconfig"
+        fi
+
+        echo
+        echo "=========================================="
+        echo "Cluster deployment complete!"
+        echo "=========================================="
+        echo "Cluster Name: $CLUSTER_NAME"
+        echo "Node IP: $NODE_IP"
+        echo "VIP: $VIP"
+        echo
+        echo "Next steps:"
+        echo "1. Verify nodes are ready: kubectl get nodes"
+        echo "2. Run post-install script for Longhorn, MetalLB, etc.: bash post-install.sh"
+        echo
+        
     else
         echo
         echo "No connection to node. Exiting script..."
         exit 1
     fi
-
-echo "Cluster deployed. Try running -- kubectl get nodes"
 
 else
     echo "Exiting script..."

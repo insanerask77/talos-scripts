@@ -1,6 +1,6 @@
 customization:
     systemExtensions:
         officialExtensions:
+            - siderolabs/cloudflared
             - siderolabs/iscsi-tools
             - siderolabs/util-linux-tools
-            - siderolabs/tailscale
