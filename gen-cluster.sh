@@ -52,7 +52,7 @@ if [[ "$RESPONSE" == "Y" ]];then
         echo "Schematic ID: $SCHEMATIC"
         
         echo "Generating Talos configuration..."
-        talosctl gen config $CLUSTER_NAME https://$VIP:6443 --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
+        talosctl gen config $CLUSTER_NAME https://$NODE_IP:6443 --install-image=factory.talos.dev/installer/$SCHEMATIC:$TALOS_VERSION
 
         # Replace VIP placeholder in network-config.yaml BEFORE injecting it
         echo "Preparing network configuration with VIP: $VIP"
